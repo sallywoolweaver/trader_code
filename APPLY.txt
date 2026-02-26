@@ -1,0 +1,16 @@
+APPLY (Chain + Tracking Fix)
+1) Replace your server.py with the included server.py
+2) Replace public/index.html with the included one
+3) Restart server
+4) Open: http://127.0.0.1:5000/
+
+What changed:
+- Chain explorer now matches /api/chain response (is_valid + blocks fields)
+- Dashboard balance uses wallet.balances (CLASSUSD row), not wallet.balance
+- Leaderboard uses /api/leaderboard?symbol=CLASSUSD and handle/amount fields
+- Added /api/prices + /api/prices/set + /api/portfolio_leaderboard
+  Portfolio uses teacher-set prices (prices table).
+
+Optional:
+- Set teacher key: set CLASSUSD_TEACHER_KEY to a password (env var).
+  Then POST /api/prices/set with {"teacher_key":"...", "symbol":"ABC", "price":1.5}

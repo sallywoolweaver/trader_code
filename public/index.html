@@ -1,0 +1,1064 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CLASSUSD Exchange</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c14;--surface:#0f1623;--surface2:#16202f;--border:#1e2d40;
+  --accent:#00e5ff;--accent2:#7c3aed;--green:#22c55e;--red:#ef4444;
+  --yellow:#fbbf24;--orange:#f97316;--text:#e2e8f0;--muted:#4a6080;
+  --mono:'Space Mono',monospace;--sans:'Syne',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.025) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;z-index:0}
+
+/*  AUTH  */
+#auth-page{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;overflow-y:auto}
+.logo{font-weight:800;font-size:clamp(2.2rem,7vw,4.5rem);letter-spacing:-2px;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.2rem;text-align:center}
+.logo-sub{font-family:var(--mono);font-size:.7rem;color:var(--muted);letter-spacing:4px;text-transform:uppercase;margin-bottom:2.5rem;text-align:center}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;width:100%;max-width:400px;position:relative;overflow:hidden}
+.auth-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.tab-row{display:flex;gap:.5rem;margin-bottom:1.5rem}
+.tab-btn{flex:1;padding:.6rem;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;font-family:var(--sans);font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s}
+.tab-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+label{display:block;font-family:var(--mono);font-size:.65rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:.4rem}
+input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:.7rem 1rem;border-radius:8px;font-family:var(--mono);font-size:.9rem;margin-bottom:1rem;outline:none;transition:border-color .2s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+select option{background:var(--surface)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.75rem 1.5rem;border:none;border-radius:8px;font-family:var(--sans);font-weight:700;font-size:.95rem;cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-primary{background:var(--accent);color:var(--bg);width:100%}
+.btn-primary:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.btn-sm{padding:.4rem .9rem;font-size:.82rem;width:auto}
+.btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn-ghost:hover{background:rgba(0,229,255,.08)}
+.btn-orange{background:var(--orange);color:white}
+.btn-purple{background:var(--accent2);color:white}
+.btn-disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+.error-msg{background:rgba(239,68,68,.12);border:1px solid var(--red);color:var(--red);padding:.6rem .9rem;border-radius:8px;font-family:var(--mono);font-size:.78rem;margin-bottom:1rem;display:none}
+.success-msg{background:rgba(34,197,94,.12);border:1px solid var(--green);color:var(--green);padding:.6rem .9rem;border-radius:8px;font-family:var(--mono);font-size:.78rem;margin-bottom:1rem;display:none}
+
+/*  APP LAYOUT  */
+#app-page{min-height:100vh;display:flex;flex-direction:column}
+nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.25rem;display:flex;align-items:center;gap:.75rem;height:58px;position:sticky;top:0;z-index:100}
+.nav-logo{font-weight:800;font-size:1.15rem;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-right:auto}
+.nav-tabs{display:flex;gap:.2rem}
+.nav-tab{padding:.4rem .8rem;border:none;background:transparent;color:var(--muted);font-family:var(--sans);font-size:.83rem;font-weight:600;cursor:pointer;border-radius:6px;transition:all .2s}
+.nav-tab:hover{color:var(--text);background:var(--surface2)}
+.nav-tab.active{color:var(--accent);background:rgba(0,229,255,.1)}
+.nav-btn{padding:.3rem .65rem;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--mono);font-size:.72rem;border-radius:6px;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center}
+.nav-btn:hover{border-color:var(--accent);color:var(--accent)}
+.nav-user{font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+main{flex:1;padding:1.75rem 1.5rem;max-width:1150px;margin:0 auto;width:100%;position:relative;z-index:1}
+
+/*  PANELS  */
+.panel{display:none}.panel.active{display:block}
+
+/*  STAT CARDS  */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.4rem;position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.stat-card.c-accent::after{background:var(--accent)}
+.stat-card.c-purple::after{background:var(--accent2)}
+.stat-card.c-green::after{background:var(--green)}
+.stat-card.c-orange::after{background:var(--orange)}
+.stat-card.c-yellow::after{background:var(--yellow)}
+.stat-label{font-family:var(--mono);font-size:.6rem;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:.4rem}
+.stat-value{font-size:1.8rem;font-weight:800;line-height:1}
+.stat-sub{font-family:var(--mono);font-size:.7rem;color:var(--muted);margin-top:.25rem}
+
+/*  TABLES  */
+.section-title{font-family:var(--mono);font-size:.65rem;letter-spacing:4px;color:var(--muted);text-transform:uppercase;margin-bottom:.9rem}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1.75rem}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.8rem}
+th{background:var(--surface2);color:var(--muted);font-size:.62rem;letter-spacing:3px;text-transform:uppercase;padding:.7rem 1rem;text-align:left;font-weight:400}
+td{padding:.8rem 1rem;border-top:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:var(--surface2)}
+.badge{display:inline-block;padding:.18rem .5rem;border-radius:4px;font-size:.67rem;font-weight:700;letter-spacing:1px}
+.badge-in{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-out{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-system{background:rgba(124,58,237,.15);color:#a78bfa}
+.badge-airdrop{background:rgba(251,191,36,.15);color:var(--yellow)}
+.badge-stake{background:rgba(249,115,22,.15);color:var(--orange)}
+
+/*  CARDS  */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.75rem;position:relative;overflow:hidden;margin-bottom:1.5rem}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+.card h2{font-size:1.2rem;font-weight:800;margin-bottom:1.25rem}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media(max-width:640px){.two-col{grid-template-columns:1fr}}
+
+/*  PORTFOLIO TABLE  */
+.portfolio-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.82rem;margin-top:1rem}
+.portfolio-table th{color:var(--muted);font-size:.6rem;letter-spacing:3px;text-transform:uppercase;padding:.5rem .75rem;text-align:right;font-weight:400;border-bottom:1px solid var(--border)}
+.portfolio-table th:first-child{text-align:left}
+.portfolio-table td{padding:.65rem .75rem;border-bottom:1px solid rgba(30,45,64,.5);vertical-align:middle}
+.portfolio-table td:not(:first-child){text-align:right}
+.portfolio-table tr:last-child td{border-bottom:none}
+.portfolio-total{border-top:2px solid var(--border);font-weight:700;color:var(--accent)}
+
+/*  COIN CARDS  */
+.coins-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin-bottom:1.75rem}
+.coin-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem;cursor:pointer;transition:border-color .2s}
+.coin-card:hover{border-color:var(--accent)}
+.coin-card.mine{border-color:var(--accent2)}
+.coin-ticker{font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:.2rem}
+.coin-name{font-size:.85rem;color:var(--muted);margin-bottom:.6rem}
+.coin-rules{display:flex;gap:.4rem;flex-wrap:wrap}
+.rule-pill{font-family:var(--mono);font-size:.62rem;padding:.15rem .4rem;border-radius:4px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.rule-pill.active-rule{color:var(--accent);border-color:rgba(0,229,255,.3)}
+
+/*  STAKING COOLDOWN  */
+.cooldown-bar-wrap{background:var(--bg);border-radius:99px;height:4px;width:100%;overflow:hidden;margin-top:.4rem}
+.cooldown-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--orange),var(--yellow));transition:width 1s linear}
+
+/*  BLOCKCHAIN  */
+.block-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem;margin-bottom:.9rem;font-family:var(--mono);font-size:.78rem}
+.block-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem}
+.block-num{background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--bg);font-weight:700;padding:.25rem .6rem;border-radius:5px;font-size:.75rem}
+.hash{color:var(--accent);word-break:break-all;font-size:.68rem;opacity:.75}
+
+/*  LEADERBOARD  */
+.rank-bar-wrap{background:var(--bg);border-radius:99px;height:5px;width:100px;overflow:hidden}
+.rank-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .6s ease}
+
+/*  TOAST  */
+#toast{position:fixed;bottom:2rem;right:2rem;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:10px;padding:.9rem 1.1rem;font-family:var(--mono);font-size:.82rem;z-index:9999;transform:translateY(120%);transition:transform .3s cubic-bezier(.34,1.56,.64,1);max-width:320px}
+#toast.show{transform:translateY(0)}
+#toast.error{border-left-color:var(--red)}
+
+/*  AUTOCOMPLETE  */
+.autocomplete-list{background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-top:-.75rem;margin-bottom:1rem;overflow:hidden;display:none}
+.autocomplete-item{padding:.5rem 1rem;font-family:var(--mono);font-size:.82rem;cursor:pointer}
+.autocomplete-item:hover{background:var(--border);color:var(--accent)}
+
+/*  RANGE  */
+input[type=range]{padding:0;margin-bottom:.3rem;accent-color:var(--accent)}
+
+/*  MOBILE  */
+@media(max-width:640px){
+  .nav-tabs{display:none}
+  nav{gap:.4rem}
+  .coins-grid{grid-template-columns:1fr}
+}
+.loading{color:var(--muted);font-family:var(--mono);font-size:.82rem;text-align:center;padding:2rem}
+.empty{color:var(--muted);font-family:var(--mono);font-size:.78rem;text-align:center;padding:2.5rem}
+.divider{height:1px;background:var(--border);margin:1.25rem 0}
+.price-tag{display:inline-block;font-family:var(--mono);font-size:.7rem;padding:.1rem .4rem;border-radius:4px;background:rgba(0,229,255,.1);color:var(--accent);margin-left:.4rem}
+.price-unknown{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!--  AUTH  -->
+<div id="auth-page">
+  <div class="logo">CLASSUSD</div>
+  <div class="logo-sub"> IB Computer Science  Class Exchange</div>
+  <div class="auth-card">
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="showTab('login')">Login</button>
+      <button class="tab-btn" onclick="showTab('register')">Register</button>
+    </div>
+    <div id="tab-login">
+      <div class="error-msg" id="login-error"></div>
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="your_name" autocomplete="off" autocapitalize="off"/>
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="password" autocomplete="off"/>
+      <button class="btn btn-primary" id="login-btn" onclick="login()">Login </button>
+    </div>
+    <div id="tab-register" style="display:none">
+      <div class="error-msg" id="reg-error"></div>
+      <div class="success-msg" id="reg-success"></div>
+      <label>Username</label>
+      <input type="text" id="reg-user" placeholder="letters, numbers, underscores" autocomplete="off" autocapitalize="off"/>
+      <label>Password</label>
+      <input type="password" id="reg-pass" placeholder="password" autocomplete="off"/>
+      <button class="btn btn-primary" onclick="register()">Create Account </button>
+    </div>
+  </div>
+</div>
+
+<!--  APP  -->
+<div id="app-page" style="display:none">
+  <nav>
+    <span class="nav-logo">CLASSUSD</span>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchPanel('dashboard')">Dashboard</button>
+      <button class="nav-tab" onclick="switchPanel('market')">Market</button>
+      <button class="nav-tab" onclick="switchPanel('send')">Send</button>
+      <button class="nav-tab" onclick="switchPanel('ledger')">Ledger</button>
+      <button class="nav-tab" onclick="switchPanel('leaderboard')">Rankings</button>
+      <button class="nav-tab" onclick="switchPanel('explorer')">Chain</button>
+    </div>
+    <a href="/api/export/csv" class="nav-btn" title="Download trades CSV"> CSV</a>
+    <a href="/api/export/db"  class="nav-btn" title="Download SQLite DB"> DB</a>
+    <span class="nav-user" id="nav-user"></span>
+    <button class="nav-btn" onclick="logout()" style="border-color:var(--red);color:var(--red)">Logout</button>
+  </nav>
+
+  <main>
+
+    <!-- DASHBOARD -->
+    <div id="panel-dashboard" class="panel active">
+      <div class="stats-grid">
+        <div class="stat-card c-accent"><div class="stat-label">CLASSUSD Balance</div><div class="stat-value" id="dash-cusd" style="color:var(--accent)"></div></div>
+        <div class="stat-card c-yellow"><div class="stat-label">Portfolio Value</div><div class="stat-value" id="dash-portfolio" style="color:var(--yellow)"></div><div class="stat-sub" id="dash-portfolio-sub">in CLASSUSD equiv.</div></div>
+        <div class="stat-card c-purple"><div class="stat-label">My Coin</div><div class="stat-value" id="dash-mycoin" style="color:#a78bfa"></div><div class="stat-sub" id="dash-mycoin-bal"></div></div>
+        <div class="stat-card c-orange"><div class="stat-label">CLASSUSD Rank</div><div class="stat-value" id="dash-rank" style="color:var(--orange)"></div></div>
+      </div>
+
+      <!-- Portfolio breakdown -->
+      <div id="portfolio-section">
+        <div class="section-title">Portfolio Breakdown</div>
+        <div class="table-wrap">
+          <table class="portfolio-table">
+            <thead><tr><th>Coin</th><th>Balance</th><th>Staked</th><th>Price (CUSD)</th><th>Est. Value</th></tr></thead>
+            <tbody id="portfolio-table-body"><tr><td colspan="5" class="loading">Loading</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- My coin management -->
+      <div id="my-coin-panel" style="display:none">
+        <div class="section-title">My Coin Controls</div>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <div>
+              <div style="font-family:var(--mono);font-size:1.3rem;font-weight:700;color:var(--accent)" id="my-coin-ticker"></div>
+              <div style="color:var(--muted);font-size:.85rem" id="my-coin-name"></div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:.6rem;flex-wrap:wrap" id="my-coin-actions"></div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;gap:2rem;flex-wrap:wrap;font-family:var(--mono);font-size:.8rem">
+            <div><span style="color:var(--muted)">Supply:</span> <span id="mc-supply"></span></div>
+            <div><span style="color:var(--muted)">Burn:</span> <span id="mc-burn"></span></div>
+            <div><span style="color:var(--muted)">Airdrop:</span> <span id="mc-airdrop"></span></div>
+            <div><span style="color:var(--muted)">Max Hold:</span> <span id="mc-maxhold"></span></div>
+            <div><span style="color:var(--muted)">Staking:</span> <span id="mc-staking"></span></div>
+          </div>
+          <div id="airdrop-result" class="success-msg" style="margin-top:1rem;margin-bottom:0"></div>
+        </div>
+      </div>
+
+      <!-- Create coin CTA -->
+      <div id="create-coin-cta" style="display:none">
+        <div class="section-title">Your Coin</div>
+        <div class="card" style="text-align:center;padding:2rem">
+          <div style="font-size:1.5rem;margin-bottom:.5rem"></div>
+          <div style="font-weight:700;margin-bottom:.5rem">You haven't created your coin yet</div>
+          <div style="color:var(--muted);font-size:.88rem;margin-bottom:1.25rem">Go to the Market tab to launch your coin with custom rules.</div>
+          <button class="btn btn-ghost btn-sm" onclick="switchPanel('market')">Create My Coin </button>
+        </div>
+      </div>
+
+      <div class="section-title">Recent Activity</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Type</th><th>Coin</th><th>From/To</th><th>Amount</th><th>Note</th><th>Time</th></tr></thead>
+        <tbody id="dash-tx-table"><tr><td colspan="6" class="loading">Loading</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- MARKET -->
+    <div id="panel-market" class="panel">
+      <div class="section-title">All Coins</div>
+      <div id="coins-grid" class="coins-grid"><div class="loading">Loading</div></div>
+
+      <div id="create-coin-section">
+        <div class="divider"></div>
+        <div class="section-title">Launch Your Coin</div>
+        <div class="card">
+          <h2> Create Your Coin</h2>
+          <div class="error-msg" id="coin-error"></div>
+          <div class="success-msg" id="coin-success"></div>
+          <div class="two-col">
+            <div>
+              <label>Ticker Symbol (e.g. BOB)</label>
+              <input type="text" id="coin-symbol" placeholder="MYCOIN" maxlength="8" style="text-transform:uppercase"/>
+              <label>Coin Name</label>
+              <input type="text" id="coin-name" placeholder="My Awesome Coin" maxlength="40"/>
+              <label>Total Supply</label>
+              <input type="number" id="coin-supply" value="1000" min="1" max="1000000"/>
+              <label>Description (what's your pitch?)</label>
+              <textarea id="coin-desc" placeholder="Why would people buy your coin?" rows="3" style="resize:vertical"></textarea>
+            </div>
+            <div>
+              <label>Burn Rate  <span id="burn-display">0%</span> per trade</label>
+              <input type="range" id="coin-burn" min="0" max="20" value="0" step="1" oninput="document.getElementById('burn-display').textContent=this.value+'%'"/>
+              <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.65rem;color:var(--muted);margin-bottom:1rem"><span>0%</span><span>20%</span></div>
+
+              <label>Airdrop Amount (per holder, 0 = disabled)</label>
+              <input type="number" id="coin-airdrop" value="0" min="0" step="1"/>
+
+              <label>Anti-Whale Max Holding (0 = no limit)</label>
+              <input type="number" id="coin-maxhold" value="0" min="0" step="1"/>
+
+              <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem">
+                <input type="checkbox" id="coin-staking" style="width:auto;margin-bottom:0"/>
+                <label style="margin-bottom:0;letter-spacing:1px">Enable Staking (2% reward per claim)</label>
+              </div>
+
+              <label>Your Password (to confirm)</label>
+              <input type="password" id="coin-pass" placeholder="password" autocomplete="off"/>
+              <button class="btn btn-primary" onclick="createCoin()">Launch Coin </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEND -->
+    <div id="panel-send" class="panel">
+      <div class="two-col">
+        <div class="card">
+          <h2> Send Coins</h2>
+          <div class="error-msg" id="send-error"></div>
+          <div class="success-msg" id="send-success"></div>
+          <label>Coin to Send</label>
+          <select id="send-coin"></select>
+          <label>Recipient</label>
+          <input type="text" id="send-to" placeholder="their_username" autocomplete="off" oninput="doAutocomplete(this.value)"/>
+          <div class="autocomplete-list" id="autocomplete-list"></div>
+          <label>Amount</label>
+          <input type="number" id="send-amount" placeholder="10.00" min="0.0001" step="0.01"/>
+          <label>Note (optional)</label>
+          <input type="text" id="send-note" placeholder="payment for" maxlength="80"/>
+          <label>Your Password</label>
+          <input type="password" id="send-pass" placeholder="password" autocomplete="off"/>
+          <button class="btn btn-primary" onclick="sendFunds()">Send </button>
+        </div>
+
+        <!-- Staking panel -->
+        <div class="card">
+          <h2> Staking</h2>
+          <div class="error-msg" id="stake-error"></div>
+          <div class="success-msg" id="stake-success"></div>
+          <label>Coin to Stake</label>
+          <select id="stake-coin" onchange="updateStakeInfo()"></select>
+          <div id="stake-info" style="font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-bottom:1rem;padding:.7rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            Select a stakeable coin above
+          </div>
+          <!-- Cooldown display -->
+          <div id="cooldown-wrap" style="display:none;margin-bottom:1rem">
+            <div style="font-family:var(--mono);font-size:.7rem;color:var(--orange);margin-bottom:.3rem">
+               Claim cooldown: <span id="cooldown-label"></span>
+            </div>
+            <div class="cooldown-bar-wrap"><div class="cooldown-bar" id="cooldown-bar" style="width:0%"></div></div>
+          </div>
+          <label>Amount (for stake/unstake)</label>
+          <input type="number" id="stake-amount" placeholder="10.00" min="0.0001" step="0.01"/>
+          <label>Your Password</label>
+          <input type="password" id="stake-pass" placeholder="password" autocomplete="off"/>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="doStake('stake')">Stake</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="doStake('unstake')">Unstake</button>
+            <button class="btn btn-orange btn-sm" style="flex:1" id="claim-btn" onclick="doStake('claim')">Claim Reward</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEDGER -->
+    <div id="panel-ledger" class="panel">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+        <div class="section-title" style="margin:0">Full Ledger</div>
+        <select id="ledger-filter" style="width:auto;margin-bottom:0;font-size:.8rem;padding:.35rem .7rem" onchange="loadLedger()">
+          <option value="">All Coins</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>#</th><th>Coin</th><th>Type</th><th>From</th><th>To</th><th>Amount</th><th>Burned</th><th>Note</th><th>Time</th></tr></thead>
+        <tbody id="ledger-table"><tr><td colspan="9" class="loading">Loading</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div id="panel-leaderboard" class="panel">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+        <div class="section-title" style="margin:0">Rankings</div>
+        <select id="lb-filter" style="width:auto;margin-bottom:0;font-size:.8rem;padding:.35rem .7rem" onchange="loadLeaderboard()">
+          <option value="CLASSUSD">CLASSUSD</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>#</th><th>Student</th><th>Balance</th><th>Staked</th><th>Share</th></tr></thead>
+        <tbody id="leaderboard-table"><tr><td colspan="5" class="loading">Loading</td></tr></tbody></table>
+      </div>
+      <div class="section-title">Overall Portfolio (CLASSUSD est.)</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>#</th><th>Student</th><th>Portfolio (CLASSUSD)</th></tr></thead>
+        <tbody id="portfolio-table"><tr><td colspan="3" class="loading">Loading</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- CHAIN EXPLORER -->
+    <div id="panel-explorer" class="panel">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+        <div class="section-title" style="margin:0">Blockchain Explorer</div>
+        <select id="chain-filter" style="width:auto;margin-bottom:0;font-size:.8rem;padding:.35rem .7rem" onchange="loadChain()">
+          <option value="CLASSUSD">CLASSUSD</option>
+        </select>
+      </div>
+      <div id="chain-valid-banner" style="font-family:var(--mono);font-size:.8rem;margin-bottom:1rem"></div>
+      <div id="blocks-container"><div class="loading">Loading</div></div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+//  STATE 
+let currentUser  = null;
+let allUsers     = [];
+let allCoins     = [];
+let allPrices    = {};
+let walletData   = null;
+let refreshTimer = null;
+let cooldownTimer = null;
+let stakeCooldownRemaining = 0;
+let stakeCooldownTotal     = 10;
+
+//  AUTH 
+
+function showTab(tab) {
+  document.getElementById('tab-login').style.display    = tab === 'login'    ? 'block' : 'none';
+  document.getElementById('tab-register').style.display = tab === 'register' ? 'block' : 'none';
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0)===(tab==='login')));
+}
+
+async function register() {
+  const u = document.getElementById('reg-user').value.trim();
+  const p = document.getElementById('reg-pass').value;
+  const err = document.getElementById('reg-error');
+  const ok  = document.getElementById('reg-success');
+  err.style.display = 'none'; ok.style.display = 'none';
+  const res = await api('/api/register', {username:u, password:p});
+  if (res.error) { err.textContent = res.error; err.style.display = 'block'; return; }
+  ok.textContent = ' Account created! You received 100 CLASSUSD. Login now.';
+  ok.style.display = 'block';
+}
+
+async function login() {
+  const u   = document.getElementById('login-user').value.trim().toLowerCase();
+  const p   = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  err.style.display = 'none';
+  if (!u || !p) { err.textContent = 'Enter username and password.'; err.style.display = 'block'; return; }
+  btn.textContent = 'Logging in'; btn.disabled = true;
+  const res = await api('/api/login', {username:u, password:p});
+  btn.textContent = 'Login '; btn.disabled = false;
+  if (res.error) { err.textContent = res.error; err.style.display = 'block'; return; }
+  currentUser = {username: res.username, password: p};
+  document.getElementById('nav-user').textContent = '@' + res.username;
+  document.getElementById('auth-page').style.display = 'none';
+  document.getElementById('app-page').style.display  = 'flex';
+  loadAllUsers(); loadAllCoins(); loadPrices(); refreshAll();
+  refreshTimer = setInterval(() => { refreshAll(); loadPrices(); }, 15000);
+}
+
+function logout() {
+  clearInterval(refreshTimer);
+  clearInterval(cooldownTimer);
+  currentUser = null;
+  document.getElementById('auth-page').style.display = 'flex';
+  document.getElementById('app-page').style.display  = 'none';
+}
+
+//  PANELS 
+
+function switchPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  const idx = ['dashboard','market','send','ledger','leaderboard','explorer'].indexOf(name);
+  document.querySelectorAll('.nav-tab')[idx]?.classList.add('active');
+  if (name === 'leaderboard') { loadLeaderboard(); loadPortfolioLeaderboard(); }
+  if (name === 'ledger')      loadLedger();
+  if (name === 'explorer')    loadChain();
+  if (name === 'market')      loadMarket();
+}
+
+//  API 
+
+async function api(url, body=null) {
+  try {
+    const opts = body
+      ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}
+      : {method:'GET'};
+    const res = await fetch(url, opts);
+    return await res.json();
+  } catch(e) { return {error:'Network error.'}; }
+}
+
+function toast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = '', 3500);
+}
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  let d = new Date(ts);
+  if (Number.isNaN(d.getTime())) d = new Date(String(ts).replace(' ', 'T') + 'Z');
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function typeBadge(type, isIn) {
+  if (type === 'welcome')     return `<span class="badge badge-system">BONUS</span>`;
+  if (type === 'airdrop')     return `<span class="badge badge-airdrop">AIRDROP</span>`;
+  if (type === 'stake_reward')return `<span class="badge badge-stake">STAKING</span>`;
+  return isIn ? `<span class="badge badge-in">IN</span>` : `<span class="badge badge-out">OUT</span>`;
+}
+
+function fmtPrice(price) {
+  if (!price || price === 0) return '<span class="price-unknown">no trades yet</span>';
+  return `<span class="price-tag">${price.toFixed(4)}</span>`;
+}
+
+//  DATA LOADING 
+
+async function loadAllUsers() {
+  allUsers = await api('/api/users');
+  if (!Array.isArray(allUsers)) allUsers = [];
+}
+
+async function loadPrices() {
+  const p = await api('/api/prices');
+  if (!p || p.error) return;
+  if (Array.isArray(p)) {
+    const mapped = {};
+    for (const row of p) {
+      if (row && row.symbol) mapped[row.symbol] = Number(row.price || 0);
+    }
+    allPrices = mapped;
+    return;
+  }
+  allPrices = p;
+}
+
+async function loadAllCoins() {
+  const c = await api('/api/coins');
+  allCoins = Array.isArray(c) ? c : [];
+  populateCoinSelects();
+}
+
+function populateCoinSelects() {
+  const coins = allCoins;
+  ['send-coin','stake-coin','ledger-filter','lb-filter','chain-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isFilter = ['ledger-filter','lb-filter','chain-filter'].includes(id);
+    el.innerHTML = '';
+    if (isFilter && id === 'ledger-filter') el.innerHTML = '<option value="">All Coins</option>';
+    coins.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.symbol;
+      opt.textContent = `${c.symbol}  ${c.name}`;
+      el.appendChild(opt);
+    });
+  });
+  updateStakeInfo();
+}
+
+async function refreshAll() {
+  if (!currentUser) return;
+  walletData = await api(`/api/wallet/${currentUser.username}`);
+  if (!walletData || walletData.error) return;
+
+  if (walletData.stake_cooldown_minutes) {
+    stakeCooldownTotal = walletData.stake_cooldown_minutes;
+  }
+
+  // CLASSUSD balance
+  const cusdBal = (walletData.balances.find(b => b.symbol === 'CLASSUSD') || {amount:0}).amount;
+  document.getElementById('dash-cusd').textContent = cusdBal.toFixed(2);
+
+  // Portfolio value
+  let totalValue = 0;
+  for (const b of walletData.balances) {
+    const price = allPrices[b.symbol] || (b.symbol === 'CLASSUSD' ? 1.0 : 0);
+    totalValue += (b.amount + b.staked) * price;
+  }
+  document.getElementById('dash-portfolio').textContent = totalValue.toFixed(2);
+
+  // My coin
+  if (walletData.my_coin) {
+    const mc = walletData.my_coin;
+    const mcBal = (walletData.balances.find(b => b.symbol === mc.symbol) || {amount:0}).amount;
+    document.getElementById('dash-mycoin').textContent = mc.symbol;
+    document.getElementById('dash-mycoin-bal').textContent = mcBal.toFixed(2) + ' held';
+    document.getElementById('my-coin-panel').style.display = 'block';
+    document.getElementById('create-coin-cta').style.display = 'none';
+    renderMyCoin(mc, mcBal);
+  } else {
+    document.getElementById('dash-mycoin').textContent = 'None';
+    document.getElementById('dash-mycoin-bal').textContent = 'Not created yet';
+    document.getElementById('my-coin-panel').style.display = 'none';
+    document.getElementById('create-coin-cta').style.display = 'block';
+  }
+
+  // CLASSUSD rank
+  const lb = await api('/api/leaderboard?symbol=CLASSUSD');
+  const rank = Array.isArray(lb) ? lb.findIndex(r => r.handle === currentUser.username) + 1 : 0;
+  document.getElementById('dash-rank').textContent = rank ? `#${rank}` : '';
+
+  // Portfolio table
+  renderPortfolioTable(walletData.balances);
+
+  // Recent tx
+  renderMyTx(walletData.transactions);
+
+  // Send dropdown (user's own balances)
+  const sendCoin = document.getElementById('send-coin');
+  const cur = sendCoin.value;
+  sendCoin.innerHTML = '';
+  walletData.balances.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.symbol;
+    opt.textContent = `${b.symbol} (${b.amount.toFixed(4)} available)`;
+    sendCoin.appendChild(opt);
+  });
+  if (cur) sendCoin.value = cur;
+
+  updateStakeInfo();
+}
+
+function renderPortfolioTable(balances) {
+  const tbody = document.getElementById('portfolio-table-body');
+  if (!balances.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No holdings yet.</td></tr>`;
+    return;
+  }
+
+  let totalVal = 0;
+  const rows = balances.map(b => {
+    const price  = (b.symbol === 'CLASSUSD') ? 1.0 : (allPrices[b.symbol] || 0);
+    const total  = b.amount + (b.staked || 0);
+    const val    = total * price;
+    totalVal += val;
+    const priceStr = price > 0
+      ? `<span style="color:var(--accent)">${price.toFixed(4)}</span>`
+      : `<span style="color:var(--muted)">no trades</span>`;
+    const valStr = val > 0
+      ? `<span style="color:var(--yellow)">${val.toFixed(2)}</span>`
+      : `<span style="color:var(--muted)"></span>`;
+    const stakedStr = b.staked > 0
+      ? `<span style="color:var(--orange)">${b.staked.toFixed(4)}</span>`
+      : `<span style="color:var(--muted)"></span>`;
+    return `<tr>
+      <td><span style="color:var(--accent);font-weight:700">${b.symbol}</span><br>
+          <span style="color:var(--muted);font-size:.7rem">${b.name}</span></td>
+      <td>${b.amount.toFixed(4)}</td>
+      <td>${stakedStr}</td>
+      <td>${priceStr}</td>
+      <td>${valStr}</td>
+    </tr>`;
+  });
+
+  rows.push(`<tr class="portfolio-total">
+    <td colspan="4" style="color:var(--muted);font-size:.75rem;letter-spacing:2px;text-transform:uppercase">Total Portfolio</td>
+    <td><span style="color:var(--yellow);font-size:1.1rem;font-weight:800">${totalVal.toFixed(2)}</span> <span style="color:var(--muted);font-size:.7rem">CUSD</span></td>
+  </tr>`);
+
+  tbody.innerHTML = rows.join('');
+}
+
+function renderMyCoin(mc, bal) {
+  document.getElementById('my-coin-ticker').textContent = mc.symbol;
+  document.getElementById('my-coin-name').textContent   = mc.name;
+  document.getElementById('mc-supply').textContent   = mc.total_supply.toLocaleString();
+  document.getElementById('mc-burn').textContent     = (mc.burn_rate*100).toFixed(1) + '%';
+  document.getElementById('mc-airdrop').textContent  = mc.airdrop_amount > 0 ? mc.airdrop_amount.toLocaleString() : 'Disabled';
+  document.getElementById('mc-maxhold').textContent  = mc.max_holding ? mc.max_holding.toLocaleString() : 'None';
+  document.getElementById('mc-staking').textContent  = mc.staking_enabled ? 'Enabled' : 'Disabled';
+
+  const actions = document.getElementById('my-coin-actions');
+  actions.innerHTML = '';
+  if (mc.airdrop_amount > 0) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-orange btn-sm';
+    btn.textContent = ' Run Airdrop';
+    btn.onclick = () => runAirdrop(mc.symbol);
+    actions.appendChild(btn);
+  }
+  if (mc.staking_enabled) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-purple btn-sm';
+    btn.textContent = ' Staking Active';
+    btn.onclick = () => switchPanel('send');
+    actions.appendChild(btn);
+  }
+}
+
+function renderMyTx(txs) {
+  const tbody = document.getElementById('dash-tx-table');
+  if (!txs || !txs.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">No transactions yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = txs.slice(0,25).map(tx => {
+    const isIn   = tx.to_user === currentUser.username;
+    const badge  = typeBadge(tx.trade_type, isIn);
+    const other  = isIn ? tx.from_user : tx.to_user;
+    const amtCls = isIn ? 'style="color:var(--green)"' : 'style="color:var(--red)"';
+    const sign   = isIn ? '+' : '-';
+    return `<tr>
+      <td>${badge}</td>
+      <td style="color:var(--accent);font-family:var(--mono)">${tx.symbol}</td>
+      <td><span style="color:var(--muted)">${isIn?'from':'to'}</span> <b>${other}</b></td>
+      <td ${amtCls} style="font-family:var(--mono)">${sign}${tx.amount.toFixed(4)}</td>
+      <td style="color:var(--muted)">${tx.note||''}</td>
+      <td style="color:var(--muted)">${fmtTime(tx.executed_at)}</td>
+    </tr>`;
+  }).join('');
+}
+
+//  MARKET 
+
+async function loadMarket() {
+  await loadAllCoins();
+  await loadPrices();
+  const coins   = allCoins;
+  const grid    = document.getElementById('coins-grid');
+  const hasCoin = walletData?.my_coin;
+  document.getElementById('create-coin-section').style.display = hasCoin ? 'none' : 'block';
+
+  if (!coins.length) {
+    grid.innerHTML = '<div class="empty">No coins yet  be the first to launch one!</div>';
+    return;
+  }
+
+  grid.innerHTML = coins.map(c => {
+    const isMine = walletData?.my_coin?.symbol === c.symbol;
+    const price  = allPrices[c.symbol] || 0;
+    const rules  = [];
+    if (c.burn_rate > 0)      rules.push({label:` Burn ${(c.burn_rate*100).toFixed(1)}%`, active:true});
+    if (c.airdrop_amount > 0) rules.push({label:` Airdrop ${c.airdrop_amount}`, active:true});
+    if (c.max_holding)        rules.push({label:` Max ${c.max_holding}`, active:true});
+    if (c.staking_enabled)    rules.push({label:` Staking`, active:true});
+    if (!rules.length)        rules.push({label:'No special rules', active:false});
+
+    const priceDisplay = price > 0
+      ? `<span class="price-tag">${price.toFixed(4)} CUSD</span>`
+      : `<span style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">no price yet</span>`;
+
+    return `<div class="coin-card ${isMine?'mine':''}" title="${c.description||''}">
+      <div class="coin-ticker">${c.symbol} ${isMine?'<span style="font-size:.65rem;color:var(--accent2)">YOUR COIN</span>':''} ${priceDisplay}</div>
+      <div class="coin-name">${c.name}</div>
+      <div style="font-family:var(--mono);font-size:.7rem;color:var(--muted);margin-bottom:.6rem">
+        by ${c.creator_name||'BANK'}  supply ${Number(c.total_supply).toLocaleString()}
+      </div>
+      ${c.description ? `<div style="font-size:.78rem;color:var(--muted);margin-bottom:.6rem;font-style:italic">"${c.description}"</div>` : ''}
+      <div class="coin-rules">${rules.map(r=>`<span class="rule-pill ${r.active?'active-rule':''}">${r.label}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+//  CREATE COIN 
+
+async function createCoin() {
+  const err = document.getElementById('coin-error');
+  const ok  = document.getElementById('coin-success');
+  err.style.display = 'none'; ok.style.display = 'none';
+
+  const symbol  = document.getElementById('coin-symbol').value.trim().toUpperCase();
+  const name    = document.getElementById('coin-name').value.trim();
+  const supply  = parseFloat(document.getElementById('coin-supply').value);
+  const burn    = parseInt(document.getElementById('coin-burn').value) / 100;
+  const airdrop = parseFloat(document.getElementById('coin-airdrop').value) || 0;
+  const maxhold = parseFloat(document.getElementById('coin-maxhold').value) || null;
+  const staking = document.getElementById('coin-staking').checked;
+  const desc    = document.getElementById('coin-desc').value.trim();
+  const pass    = document.getElementById('coin-pass').value;
+
+  const res = await api('/api/coins/create', {
+    username: currentUser.username, password: pass,
+    symbol, name, total_supply: supply, burn_rate: burn,
+    airdrop_amount: airdrop, max_holding: maxhold || null,
+    staking_enabled: staking, description: desc
+  });
+
+  if (res.error) { err.textContent = res.error; err.style.display = 'block'; return; }
+  ok.textContent = ` ${symbol} launched! You hold the full supply.`;
+  ok.style.display = 'block';
+  document.getElementById('create-coin-section').style.display = 'none';
+  toast(` ${symbol} is live!`);
+  await loadAllCoins();
+  await refreshAll();
+  loadMarket();
+}
+
+//  SEND 
+
+async function sendFunds() {
+  const err = document.getElementById('send-error');
+  const ok  = document.getElementById('send-success');
+  err.style.display = 'none'; ok.style.display = 'none';
+
+  const symbol = document.getElementById('send-coin').value;
+  const to     = document.getElementById('send-to').value.trim().toLowerCase();
+  const amount = parseFloat(document.getElementById('send-amount').value);
+  const note   = document.getElementById('send-note').value.trim();
+  const pass   = document.getElementById('send-pass').value;
+
+  if (!symbol||!to||!amount||!pass) {
+    err.textContent='Fill in all required fields.'; err.style.display='block'; return;
+  }
+
+  const res = await api('/api/send', {from:currentUser.username, password:pass, to, symbol, amount, note});
+  if (res.error) { err.textContent=res.error; err.style.display='block'; return; }
+
+  const burned = res.burned > 0 ? ` (${res.burned.toFixed(4)} burned )` : '';
+  ok.textContent = ` Sent ${amount} ${symbol} to @${to}. They received ${res.received.toFixed(4)}.${burned}`;
+  ok.style.display = 'block';
+  toast(` Sent ${amount} ${symbol} to @${to}`);
+  document.getElementById('send-amount').value='';
+  document.getElementById('send-note').value='';
+  document.getElementById('send-pass').value='';
+  refreshAll();
+  loadPrices();
+}
+
+//  AIRDROP 
+
+async function runAirdrop(symbol) {
+  const res = await api('/api/airdrop', {
+    username: currentUser.username, password: currentUser.password, symbol
+  });
+  const el = document.getElementById('airdrop-result');
+  if (res.error) {
+    el.style.cssText = 'display:block;background:rgba(239,68,68,.12);border-color:var(--red);color:var(--red);margin-top:1rem;margin-bottom:0';
+    el.textContent = res.error;
+  } else {
+    el.style.cssText = 'display:block;margin-top:1rem;margin-bottom:0';
+    el.textContent = ` ${res.message || `Airdrop complete! Sent to ${res.recipients} holders.`}`;
+    toast(` Airdrop sent to ${res.recipients} holders!`);
+    refreshAll();
+  }
+}
+
+//  STAKING 
+
+function updateStakeInfo() {
+  const symbol = document.getElementById('stake-coin')?.value;
+  if (!symbol || !walletData) return;
+
+  const coin = allCoins.find(c => c.symbol === symbol);
+  const bal  = walletData.balances.find(b => b.symbol === symbol);
+  const info = document.getElementById('stake-info');
+
+  if (!coin?.staking_enabled) {
+    info.textContent = `${symbol} does not support staking.`;
+    document.getElementById('cooldown-wrap').style.display = 'none';
+    document.getElementById('claim-btn').classList.add('btn-disabled');
+    return;
+  }
+
+  const held   = bal?.amount  || 0;
+  const staked = bal?.staked  || 0;
+  const reward = (staked * 0.02).toFixed(4);
+  info.innerHTML = `Available: <b style="color:var(--accent)">${held.toFixed(4)}</b>  Staked: <b style="color:var(--orange)">${staked.toFixed(4)}</b><br>
+    <span style="color:var(--muted);font-size:.72rem">Reward rate: 2% per claim  Next reward: ~${reward} ${symbol}</span>`;
+
+  // Cooldown display
+  const cooldownMins = bal?.claim_cooldown_minutes || 0;
+  const cooldownWrap = document.getElementById('cooldown-wrap');
+  const claimBtn     = document.getElementById('claim-btn');
+
+  if (cooldownMins > 0) {
+    stakeCooldownRemaining = cooldownMins;
+    cooldownWrap.style.display = 'block';
+    claimBtn.classList.add('btn-disabled');
+    startCooldownTicker(cooldownMins, stakeCooldownTotal);
+  } else {
+    cooldownWrap.style.display = 'none';
+    claimBtn.classList.remove('btn-disabled');
+    clearInterval(cooldownTimer);
+  }
+}
+
+function startCooldownTicker(remainingMins, totalMins) {
+  clearInterval(cooldownTimer);
+  let remainingSecs = Math.ceil(remainingMins * 60);
+  const total = totalMins * 60;
+
+  function tick() {
+    if (remainingSecs <= 0) {
+      clearInterval(cooldownTimer);
+      document.getElementById('cooldown-wrap').style.display = 'none';
+      document.getElementById('claim-btn').classList.remove('btn-disabled');
+      document.getElementById('cooldown-label').textContent = 'Ready!';
+      return;
+    }
+    const mins = Math.floor(remainingSecs / 60);
+    const secs = remainingSecs % 60;
+    document.getElementById('cooldown-label').textContent =
+      `${mins}m ${secs.toString().padStart(2,'0')}s remaining`;
+    const pct = Math.max(0, (remainingSecs / total) * 100);
+    document.getElementById('cooldown-bar').style.width = pct + '%';
+    remainingSecs--;
+  }
+
+  tick();
+  cooldownTimer = setInterval(tick, 1000);
+}
+
+async function doStake(action) {
+  const err    = document.getElementById('stake-error');
+  const ok     = document.getElementById('stake-success');
+  err.style.display='none'; ok.style.display='none';
+
+  const symbol = document.getElementById('stake-coin').value;
+  const amount = parseFloat(document.getElementById('stake-amount').value)||0;
+  const pass   = document.getElementById('stake-pass').value;
+
+  if (!pass) { err.textContent='Enter your password.'; err.style.display='block'; return; }
+
+  const res = await api('/api/stake', {username:currentUser.username, password:pass, symbol, action, amount});
+  if (res.error) { err.textContent=res.error; err.style.display='block'; return; }
+
+  if (action==='claim') {
+    ok.textContent = ` Claimed ${res.reward.toFixed(4)} ${symbol}! Next claim in ${res.next_claim_in_minutes} minutes.`;
+    toast(` Claimed ${res.reward.toFixed(4)} ${symbol}`);
+    // Start local cooldown countdown
+    startCooldownTicker(res.next_claim_in_minutes, stakeCooldownTotal);
+    document.getElementById('cooldown-wrap').style.display = 'block';
+    document.getElementById('claim-btn').classList.add('btn-disabled');
+  } else {
+    ok.textContent = ` ${action==='stake'?'Staked':'Unstaked'} ${amount} ${symbol}. Total staked: ${res.staked.toFixed(4)}.`;
+  }
+  ok.style.display='block';
+  refreshAll();
+}
+
+//  LEDGER 
+
+async function loadLedger() {
+  const symbol = document.getElementById('ledger-filter').value;
+  const url    = symbol ? `/api/ledger?symbol=${symbol}` : '/api/ledger';
+  const txs    = await api(url);
+  const tbody  = document.getElementById('ledger-table');
+  if (!Array.isArray(txs) || !txs.length) {
+    tbody.innerHTML=`<tr><td colspan="9" class="empty">No transactions yet.</td></tr>`; return;
+  }
+  const typeColors = {transfer:'var(--text)',airdrop:'var(--yellow)',stake_reward:'var(--orange)',welcome:'#a78bfa'};
+  tbody.innerHTML = txs.map(tx => `<tr>
+    <td style="color:var(--accent);font-family:var(--mono)">${tx.trade_id}</td>
+    <td style="color:var(--accent);font-family:var(--mono)">${tx.symbol}</td>
+    <td style="color:${typeColors[tx.trade_type]||'var(--text)'}">${tx.trade_type}</td>
+    <td><b>${tx.from_user}</b></td>
+    <td><b>${tx.to_user}</b></td>
+    <td style="color:var(--yellow);font-family:var(--mono)">${tx.amount.toFixed(4)}</td>
+    <td style="color:var(--red);font-family:var(--mono)">${tx.burned_amount>0?tx.burned_amount.toFixed(4):''}</td>
+    <td style="color:var(--muted)">${tx.note||''}</td>
+    <td style="color:var(--muted)">${fmtTime(tx.executed_at)}</td>
+  </tr>`).join('');
+}
+
+//  LEADERBOARD 
+
+async function loadLeaderboard() {
+  const symbol = document.getElementById('lb-filter').value || 'CLASSUSD';
+  const data   = await api(`/api/leaderboard?symbol=${symbol}`);
+  const tbody  = document.getElementById('leaderboard-table');
+  if (!Array.isArray(data) || !data.length) {
+    tbody.innerHTML=`<tr><td colspan="5" class="empty">No holders yet.</td></tr>`; return;
+  }
+  const max    = data[0].amount;
+  const medals = ['','',''];
+  tbody.innerHTML = data.map((s,i) => {
+    const pct  = max>0 ? (s.amount/max*100).toFixed(0) : 0;
+    const isMe = s.handle === currentUser.username;
+    return `<tr ${isMe?'style="background:rgba(0,229,255,.04)"':''}>
+      <td style="font-weight:800;color:${i<3?['#fbbf24','#94a3b8','#b87333'][i]:'var(--muted)'}">${medals[i]||i+1}</td>
+      <td><b>${s.handle}</b>${isMe?' <span style="color:var(--accent);font-size:.68rem">(you)</span>':''}</td>
+      <td style="color:var(--yellow);font-family:var(--mono)">${s.amount.toFixed(4)}</td>
+      <td style="color:var(--orange);font-family:var(--mono)">${(s.staked||0).toFixed(4)}</td>
+      <td><div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadPortfolioLeaderboard() {
+  const data = await api('/api/portfolio_leaderboard');
+  const tbody = document.getElementById('portfolio-table');
+  if (!tbody) return;
+  if (!Array.isArray(data) || !data.length) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty">No students yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map((s, i) => `
+    <tr>
+      <td style="font-weight:800">${i + 1}</td>
+      <td><b>${s.username}</b></td>
+      <td style="color:var(--yellow);font-family:var(--mono)">${Number(s.portfolio || 0).toFixed(2)}</td>
+    </tr>
+  `).join('');
+}
+
+//  CHAIN EXPLORER 
+
+async function loadChain() {
+  const symbol = document.getElementById('chain-filter').value || 'CLASSUSD';
+  const data   = await api(`/api/chain?symbol=${symbol}`);
+  const banner = document.getElementById('chain-valid-banner');
+  if (!data || data.error) { banner.innerHTML = `<span style="color:var(--red)">Error loading chain.</span>`; return; }
+  banner.innerHTML = data.is_valid
+    ? `<span style="color:var(--green)"> Chain valid</span> <span style="color:var(--muted)"> ${data.blocks.length} blocks  ${symbol}</span>`
+    : `<span style="color:var(--red)"> Chain integrity error at block ${data.first_bad_block}!</span>`;
+
+  document.getElementById('blocks-container').innerHTML = [...data.blocks].reverse().map(b => `
+    <div class="block-card">
+      <div class="block-header">
+        <span class="block-num">Block #${b.block_id}</span>
+        <span style="color:var(--muted);font-size:.72rem">${fmtTime(b.trade_time)}</span>
+        <span style="color:var(--muted);font-size:.72rem">trade #${b.trade_id}  ${b.trade_type}</span>
+        <span style="margin-left:auto;padding:.18rem .5rem;border-radius:4px;font-size:.67rem;font-weight:700;background:rgba(34,197,94,.15);color:var(--green)">VALID</span>
+      </div>
+      <div style="margin-bottom:.3rem">
+        <span style="color:var(--muted)">tx: </span>
+        <b>${b.from_user}</b> <span style="color:var(--accent)"></span> <b>${b.to_user}</b>
+        <span style="float:right;color:var(--yellow)">${b.amount.toFixed(4)} ${symbol}</span>
+      </div>
+      <div style="margin-bottom:.25rem"><span style="color:var(--muted)">hash: </span><span class="hash">${b.this_hash}</span></div>
+      <div><span style="color:var(--muted)">prev: </span><span class="hash">${b.prev_hash}</span></div>
+    </div>
+  `).join('');
+}
+
+//  AUTOCOMPLETE 
+
+function doAutocomplete(val) {
+  const list = document.getElementById('autocomplete-list');
+  if (!val) { list.style.display='none'; return; }
+  const matches = allUsers.filter(u => u.includes(val.toLowerCase()) && u !== currentUser.username).slice(0,5);
+  if (!matches.length) { list.style.display='none'; return; }
+  list.style.display='block';
+  list.innerHTML = matches.map(u=>`<div class="autocomplete-item" onclick="selectUser('${u}')">${u}</div>`).join('');
+}
+function selectUser(u) {
+  document.getElementById('send-to').value = u;
+  document.getElementById('autocomplete-list').style.display='none';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#send-to') && !e.target.closest('#autocomplete-list'))
+    document.getElementById('autocomplete-list').style.display='none';
+});
+
+// Enter key on login
+document.addEventListener('keydown', e => {
+  if (e.key==='Enter' && document.getElementById('auth-page').style.display!=='none') login();
+});
+</script>
+</body>
+</html>
+

@@ -22,11 +22,10 @@ from flask import Flask, request, jsonify, send_file, send_from_directory, g
 app = Flask(__name__, static_folder='public')
 
 DB_PATH          = 'classusd.db'
+TEACHER_KEY = os.environ.get('CLASSUSD_TEACHER_KEY','')
 RESERVE_CURRENCY = 'CLASSUSD'   # the base currency everyone starts with
 STARTING_BALANCE = 100.0        # how much CLASSUSD each student gets on signup
 STAKING_RATE     = 0.02         # 2% per manual claim (teacher can adjust)
-STAKE_SECONDS_PER_DAY = 86400
-STAKING_CLAIM_COOLDOWN_SECONDS = 3600  # 1 hour between claims (adjustable)
 
 
 # ─────────────────────────────────────────
@@ -48,8 +47,6 @@ def close_db(e=None):
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript("""
         -- ── USERS ──────────────────────────────────────────────────
@@ -85,7 +82,6 @@ def init_db():
             amount      REAL    NOT NULL DEFAULT 0.0 CHECK(amount >= 0),
             staked      REAL    NOT NULL DEFAULT 0.0 CHECK(staked >= 0),
             last_staked TEXT,
-            last_claimed TEXT,
             UNIQUE(user_id, coin_id)
         );
 
@@ -114,6 +110,15 @@ def init_db():
             block_data  TEXT    NOT NULL,
             this_hash   TEXT    NOT NULL,
             created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        
+        -- ── PRICES (for tracking portfolio value in CLASSUSD) ───────────────
+        -- Teacher can set a reference price for each coin in CLASSUSD.
+        CREATE TABLE IF NOT EXISTS prices (
+            coin_id     INTEGER PRIMARY KEY REFERENCES coins(coin_id),
+            price       REAL    NOT NULL DEFAULT 1.0,   -- in CLASSUSD per 1 coin
+            updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
         );
 
         -- ── VIEWS ──────────────────────────────────────────────────
@@ -151,18 +156,20 @@ def init_db():
             ORDER BY c.symbol, b.amount DESC;
     """)
 
-    # Lightweight migration for older DBs (adds last_claimed column if missing)
-    cols = [r['name'] for r in conn.execute("PRAGMA table_info(balances)").fetchall()]
-    if 'last_claimed' not in cols:
-        conn.execute("ALTER TABLE balances ADD COLUMN last_claimed TEXT")
-
-
     # Seed the reserve currency
     conn.execute("""
         INSERT OR IGNORE INTO coins
             (symbol, name, creator_id, total_supply, burn_rate, description)
         VALUES (?, ?, NULL, 999999, 0.0, 'The class reserve currency. Everyone starts with 100.')
     """, (RESERVE_CURRENCY, 'ClassUSD'))
+    conn.commit()
+
+    # Seed price rows for any coins that don't have one yet
+    conn.execute("""
+        INSERT OR IGNORE INTO prices (coin_id, price)
+        SELECT coin_id, CASE WHEN symbol = ? THEN 1.0 ELSE 1.0 END
+        FROM coins
+    """, (RESERVE_CURRENCY,))
     conn.commit()
     conn.close()
     print("✅ Database ready.")
@@ -185,6 +192,147 @@ def compute_block_hash(prev_hash, trade_id, from_user_id, to_user_id, coin_id, a
 def get_reserve_id(db):
     r = db.execute("SELECT coin_id FROM coins WHERE symbol=?", (RESERVE_CURRENCY,)).fetchone()
     return r['coin_id']
+
+
+def get_implied_prices(db, window_seconds=60):
+    """
+    Estimate coin prices in CLASSUSD from matched transfer pairs:
+    - one non-CLASSUSD transfer
+    - one CLASSUSD transfer
+    - same two users (either direction)
+    - executed within `window_seconds`
+    """
+    reserve_id = get_reserve_id(db)
+
+    # Potential matches (many-to-many). We'll greedily choose closest unique pairs.
+    candidates = db.execute("""
+        SELECT
+            ct.trade_id  AS coin_trade_id,
+            ct.coin_id   AS coin_id,
+            cc.symbol    AS symbol,
+            ct.amount    AS coin_amount,
+            rt.trade_id  AS cash_trade_id,
+            rt.amount    AS cash_amount,
+            ABS(strftime('%s', ct.executed_at) - strftime('%s', rt.executed_at)) AS time_gap_s,
+            CASE
+                WHEN ct.executed_at >= rt.executed_at THEN ct.executed_at
+                ELSE rt.executed_at
+            END AS matched_at
+        FROM trades ct
+        JOIN coins cc ON cc.coin_id = ct.coin_id
+        JOIN trades rt ON rt.coin_id = ?
+        WHERE ct.trade_type = 'TRANSFER'
+          AND rt.trade_type = 'TRANSFER'
+          AND ct.coin_id != ?
+          AND ct.from_user_id IS NOT NULL
+          AND ct.to_user_id   IS NOT NULL
+          AND rt.from_user_id IS NOT NULL
+          AND rt.to_user_id   IS NOT NULL
+          AND (
+                (ct.from_user_id = rt.from_user_id AND ct.to_user_id = rt.to_user_id)
+             OR (ct.from_user_id = rt.to_user_id   AND ct.to_user_id = rt.from_user_id)
+          )
+          AND ABS(strftime('%s', ct.executed_at) - strftime('%s', rt.executed_at)) <= ?
+        ORDER BY time_gap_s ASC, ct.trade_id DESC, rt.trade_id DESC
+    """, (reserve_id, reserve_id, int(window_seconds))).fetchall()
+
+    used_coin_trades = set()
+    used_cash_trades = set()
+    implied_by_coin = {}  # coin_id -> stats
+    for row in candidates:
+        coin_tid = row['coin_trade_id']
+        cash_tid = row['cash_trade_id']
+        if coin_tid in used_coin_trades or cash_tid in used_cash_trades:
+            continue
+        used_coin_trades.add(coin_tid)
+        used_cash_trades.add(cash_tid)
+
+        coin_id = row['coin_id']
+        stats = implied_by_coin.setdefault(coin_id, {
+            'sum_coin': 0.0,
+            'sum_cash': 0.0,
+            'matches': 0,
+            'updated_at': row['matched_at']
+        })
+        stats['sum_coin'] += float(row['coin_amount'] or 0.0)
+        stats['sum_cash'] += float(row['cash_amount'] or 0.0)
+        stats['matches'] += 1
+        if row['matched_at'] and (not stats['updated_at'] or row['matched_at'] > stats['updated_at']):
+            stats['updated_at'] = row['matched_at']
+
+    base_rows = db.execute("""
+        SELECT c.coin_id, c.symbol, c.name,
+               COALESCE(p.price, 0.0) AS fallback_price,
+               p.updated_at AS fallback_updated_at
+        FROM coins c
+        LEFT JOIN prices p ON p.coin_id = c.coin_id
+        ORDER BY c.symbol
+    """).fetchall()
+
+    out = []
+    for r in base_rows:
+        coin_id = r['coin_id']
+        symbol = r['symbol']
+        if symbol == RESERVE_CURRENCY:
+            out.append({
+                'symbol': symbol,
+                'name': r['name'],
+                'price': 1.0,
+                'method': 'reserve',
+                'matches': 0,
+                'updated_at': now_iso()
+            })
+            continue
+
+        stats = implied_by_coin.get(coin_id)
+        if stats and stats['sum_coin'] > 0:
+            out.append({
+                'symbol': symbol,
+                'name': r['name'],
+                'price': stats['sum_cash'] / stats['sum_coin'],
+                'method': 'implied',
+                'matches': stats['matches'],
+                'updated_at': stats['updated_at']
+            })
+        else:
+            out.append({
+                'symbol': symbol,
+                'name': r['name'],
+                'price': float(r['fallback_price'] or 0.0),
+                'method': 'fallback',
+                'matches': 0,
+                'updated_at': r['fallback_updated_at']
+            })
+    return out
+
+
+def compute_portfolio_value(db, user_id):
+    """Returns (cash_classusd, portfolio_value_classusd). Uses prices table."""
+    # Get CLASSUSD coin_id + cash amount
+    res = db.execute("SELECT coin_id FROM coins WHERE symbol=?", (RESERVE_CURRENCY,)).fetchone()
+    reserve_id = res['coin_id']
+    cash, cash_staked = get_balance(db, user_id, reserve_id)
+    cash_total = cash + cash_staked
+
+    rows = db.execute("""
+        SELECT b.coin_id, c.symbol, (b.amount + b.staked) AS units, p.price
+        FROM balances b
+        JOIN coins c ON c.coin_id=b.coin_id
+        LEFT JOIN prices p ON p.coin_id=b.coin_id
+        WHERE b.user_id=?
+    """, (user_id,)).fetchall()
+
+    total = 0.0
+    for r in rows:
+        units = float(r['units'] or 0.0)
+        price = float(r['price'] or 0.0)
+        # reserve currency price is 1 by definition
+        if r['symbol'] == RESERVE_CURRENCY:
+            total += units
+        else:
+            total += units * price
+    return cash_total, total
+
 
 def get_balance(db, user_id, coin_id):
     r = db.execute(
@@ -242,8 +390,8 @@ def do_transfer(db, from_user_id, to_user_id, coin_id, amount,
 
     # Anti-whale check
     if coin['max_holding'] and to_user_id:
-        cur_bal, cur_staked = get_balance(db, to_user_id, coin_id)
-        if (cur_bal + cur_staked) + received > coin['max_holding']:
+        cur_bal, _ = get_balance(db, to_user_id, coin_id)
+        if cur_bal + received > coin['max_holding']:
             return None, 0, 0, (
                 f"Anti-whale limit: {coin['symbol']} holders can't exceed "
                 f"{coin['max_holding']:.2f}. Recipient has {cur_bal:.2f}."
@@ -346,7 +494,7 @@ def create_coin():
     supply   = d.get('total_supply', 1000)
     burn     = d.get('burn_rate', 0.0)
     airdrop  = d.get('airdrop_amount', 0.0)
-    max_hold = d.get('max_holding')      # None/'' = no limit
+    max_hold = d.get('max_holding')      # None = no limit
     staking  = 1 if d.get('staking_enabled') else 0
     desc     = (d.get('description') or '').strip()
 
@@ -368,17 +516,6 @@ def create_coin():
             raise ValueError
     except:
         return jsonify(error='Invalid supply or burn rate.'), 400
-
-    # max_holding: allow None / '' for "no limit"
-    try:
-        if max_hold is None or (isinstance(max_hold, str) and max_hold.strip() == ''):
-            max_hold = None
-        else:
-            max_hold = float(max_hold)
-            if max_hold <= 0:
-                return jsonify(error='Invalid max holding.'), 400
-    except:
-        return jsonify(error='Invalid max holding.'), 400
 
     db  = get_db()
     row = db.execute("SELECT user_id, password_hash FROM users WHERE handle=?", (handle,)).fetchone()
@@ -559,50 +696,12 @@ def stake():
 
     elif action == 'claim':
         if staked <= 0: return jsonify(error='Nothing staked.'), 400
-
-        # Cooldown + time-based reward (prevents infinite spam-claim)
-        row = db.execute(
-            "SELECT last_claimed, last_staked FROM balances WHERE user_id=? AND coin_id=?",
-            (uid, cid)
-        ).fetchone()
-        last_claimed = (row['last_claimed'] if row else None) or (row['last_staked'] if row else None)
-
-        now_ts = now_iso()
-
-        def _parse(ts):
-            if not ts: 
-                return None
-            try:
-                return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
-            except:
-                return None
-
-        t0 = _parse(last_claimed)
-        t1 = _parse(now_ts)
-        elapsed = (t1 - t0).total_seconds() if (t0 and t1) else STAKE_SECONDS_PER_DAY
-
-        if t0 and elapsed < STAKING_CLAIM_COOLDOWN_SECONDS:
-            remaining = int(STAKING_CLAIM_COOLDOWN_SECONDS - elapsed)
-            return jsonify(error=f"Claim cooldown: wait {remaining}s before claiming again."), 400
-
-        days = max(0.0, elapsed / STAKE_SECONDS_PER_DAY)
-        reward = round(staked * STAKING_RATE * days, 4)
-        if reward <= 0:
-            return jsonify(error="No reward accrued yet."), 400
-
-        _, _, _, err = do_transfer(
-            db, None, uid, cid, reward, 'stake_reward',
-            f"Staking reward ({STAKING_RATE*100:.2f}% per day × {days:.3f}d on {staked:.4f} staked)"
-        )
+        reward = round(staked * STAKING_RATE, 4)
+        _, _, _, err = do_transfer(db, None, uid, cid, reward, 'stake_reward',
+                                   f'Staking reward ({STAKING_RATE*100:.0f}% of {staked:.2f} staked)')
         if err: return jsonify(error=err), 400
-
-        db.execute(
-            "UPDATE balances SET last_claimed=? WHERE user_id=? AND coin_id=?",
-            (now_ts, uid, cid)
-        )
         db.commit()
-        return jsonify(success=True, reward=reward, days=days)
-
+        return jsonify(success=True, reward=reward)
 
     return jsonify(error='Unknown action.'), 400
 
@@ -621,7 +720,7 @@ def wallet(username):
     # All balances for this user
     bals = db.execute("""
         SELECT c.symbol, c.name, c.burn_rate, c.staking_enabled,
-               c.max_holding, b.amount, b.staked, b.last_claimed
+               c.max_holding, b.amount, b.staked
         FROM balances b
         JOIN coins c ON b.coin_id = c.coin_id
         WHERE b.user_id = ?
@@ -672,12 +771,80 @@ def leaderboard():
     return jsonify([dict(r) for r in rows])
 
 
+
+@app.route('/api/prices')
+def api_prices():
+    db = get_db()
+    rows = get_implied_prices(db, window_seconds=60)
+    return jsonify(rows)
+
+
+@app.route('/api/prices/set', methods=['POST'])
+def api_prices_set():
+    """Teacher sets reference prices (in CLASSUSD)."""
+    d = request.json or {}
+    key = d.get('teacher_key') or ''
+    if TEACHER_KEY and key != TEACHER_KEY:
+        return jsonify(error='Invalid teacher key.'), 401
+
+    symbol = (d.get('symbol') or '').strip().upper()
+    try:
+        price = float(d.get('price', 0))
+    except:
+        return jsonify(error='Invalid price.'), 400
+    if price < 0:
+        return jsonify(error='Price must be >= 0.'), 400
+
+    db = get_db()
+    coin = db.execute("SELECT coin_id FROM coins WHERE symbol=?", (symbol,)).fetchone()
+    if not coin:
+        return jsonify(error='Coin not found.'), 404
+
+    db.execute("""
+        INSERT INTO prices(coin_id, price, updated_at)
+        VALUES (?,?,?)
+        ON CONFLICT(coin_id) DO UPDATE SET price=excluded.price, updated_at=excluded.updated_at
+    """, (coin['coin_id'], price, now_iso()))
+    db.commit()
+    return jsonify(success=True, symbol=symbol, price=price)
+
+
+@app.route('/api/portfolio_leaderboard')
+def api_portfolio_leaderboard():
+    """Leaderboard ranked by implied-valuation portfolio value in CLASSUSD."""
+    db = get_db()
+    price_rows = get_implied_prices(db, window_seconds=60)
+    price_map = {p['symbol']: float(p.get('price') or 0.0) for p in price_rows}
+    users = db.execute("SELECT user_id, handle FROM users").fetchall()
+    out = []
+    for u in users:
+        bals = db.execute("""
+            SELECT c.symbol, (b.amount + b.staked) AS units
+            FROM balances b
+            JOIN coins c ON c.coin_id = b.coin_id
+            WHERE b.user_id=?
+        """, (u['user_id'],)).fetchall()
+        total = 0.0
+        cash = 0.0
+        for b in bals:
+            symbol = b['symbol']
+            units = float(b['units'] or 0.0)
+            if symbol == RESERVE_CURRENCY:
+                cash += units
+                total += units
+            else:
+                total += units * float(price_map.get(symbol, 0.0))
+        out.append({"username": u["handle"], "cash": round(cash,2), "portfolio": round(total,2)})
+    out.sort(key=lambda x: x["portfolio"], reverse=True)
+    return jsonify(out)
+
+
 @app.route('/api/ledger')
 def ledger():
     symbol = request.args.get('symbol', '').upper()
     db     = get_db()
     query  = """
-        SELECT t.trade_id, COALESCE(s.handle,'SYSTEM') AS from_user,
+        SELECT t.trade_id, lb.block_id, COALESCE(s.handle,'SYSTEM') AS from_user,
                r.handle AS to_user, c.symbol, t.amount,
                t.burned_amount, t.trade_type, t.note, t.executed_at,
                lb.this_hash AS block_hash
